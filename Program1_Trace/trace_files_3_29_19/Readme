@@ -1,0 +1,8 @@
+Lam Tran 
+ltran73@calpoly.edu
+Time: Noon
+
+HOW TO RUN THIS:
+make trace
+./trace <pcap_file>
+pcap_file --> ArpTest.pcap
