@@ -8,11 +8,11 @@ LIBS =
 
 all:   myClient myServer
 
-myClient: myClient.c networks.o gethostbyname.o cMessage.o
-	$(CC) $(CFLAGS) -o myCclient myClient.c networks.o gethostbyname.o cMessage.o $(LIBS)
+myClient: myClient.c networks.o gethostbyname.o cMessage.o pollLib.o safeUtil.o
+	$(CC) $(CFLAGS) -o myCclient myClient.c networks.o gethostbyname.o cMessage.o pollLib.o safeUtil.o $(LIBS)
 
 myServer: myServer.c networks.o gethostbyname.o cMessage.o
-	$(CC) $(CFLAGS) -o myServer myServer.c networks.o gethostbyname.o cMessage.o $(LIBS)
+	$(CC) $(CFLAGS) -o myServer myServer.c networks.o gethostbyname.o cMessage.o pollLib.o safeUtil.o $(LIBS)
 
 .c.o:
 	gcc -c $(CFLAGS) $< -o $@ $(LIBS)
