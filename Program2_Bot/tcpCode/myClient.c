@@ -19,44 +19,86 @@
 
 #include "networks.h"
 #include "cMessage.h"
+#include "pollLib.h"
 
 #define MAXBUF 1024
 #define DEBUG_FLAG 1
 
-char * sendToServer(int socketNum);
+int sendToServer(int socketNum);
 int readFromStdin(char * buffer);
 void checkArgs(int argc, char * argv[]);
+void setupClientPoll(int socketNum);
+void processServer(int socketNumber);
 
 int main(int argc, char * argv[])
 {
 	int socketNum = 0;         //socket descriptor
 	char * pduSend;
-
+	int socketReady = 0;
 	char * pduReturned;
-
-	char exit[] = "exit";
+	
 	checkArgs(argc, argv);
 
 	/* set up the TCP Client socket  */
 	socketNum = tcpClientSetup(argv[1], argv[2], DEBUG_FLAG);
+	// printf("SocketNum %d\n", socketNum);
+	setupClientPoll(socketNum);
+	// pduSend = sendToServer(socketNum);
 
 	
-	pduSend = sendToServer(socketNum);
 
-	while (strcmp(pduSend, exit) != 0) {
-		pduSend = sendToServer(socketNum);
+	while (1) {
+		// printf("Blocking\n");
+		socketReady = pollCall(-1);
+		// printf("Socketready %d\n", socketReady);
+		if (socketReady == socketNum)
+		{
+			// Receiv pdu and print it out
+			// printf("Socket Readyy for server= %d \n", socketReady);
+			processServer(socketReady);
+		}
+		else {
+			// printf("Socket Readyy = %d \n", socketReady);
+
+			pduSend = sendToServer(socketNum);
+			if (pduSend == -1) {
+				// close(socketReady);
+				break;
+			}
+		}
 	}
+	// while (strcmp(pduSend, exit) != 0) {
+	// 	pduSend = sendToServer(socketNum);
+	// }
 	
 	close(socketNum);
 	
 	return 0;
 }
 
-char * sendToServer(int socketNum)
+void processServer(int socketNumber) {
+	char buf[MAXBUF];
+	int receiveLength;
+	receiveLength = recvPDU(socketNumber, buf, MAXBUF);
+	printf("Message Received from server: %s\n", buf);
+
+}
+
+void setupClientPoll(int socketNum) {
+	setupPollSet();
+	addToPollSet(socketNum);
+	addToPollSet(STDIN_FILENO);
+}
+
+int sendToServer(int socketNum)
 {
 	char sendBuf[MAXBUF];   //data buffer
 	int sendLen = 0;        //amount of data to send
 	int sent = 0;            //actual amount of data sent/* get the data and send it   */
+
+	char exitStr[] = "exit";
+
+
 	
 	sendLen = readFromStdin(sendBuf);
 	printf("read: %s string len: %d (including null)\n", sendBuf, sendLen);
@@ -70,7 +112,12 @@ char * sendToServer(int socketNum)
 	}
 
 	printf("Amount of data sent is: %d\n", sent);
-	return sendBuf;
+	// receiveLength = recvPDU(socketNum, sendBuf, sent);
+	// printf("Received buffer %s\n", sendBuf);
+	if (strcmp(sendBuf, exitStr) == 0) {
+		return -1;
+	}
+	return 0;
 }
 
 int readFromStdin(char * buffer)
