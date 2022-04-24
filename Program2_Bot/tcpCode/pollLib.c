@@ -67,7 +67,6 @@ int pollCall(int timeInMilliSeconds)
 	// if timeInMilliSeconds == -1 blocks forever (until a socket ready)
 	// (this -1 is a feature of poll)
 	// If timeInMilliSeconds == 0 it will return immediately after looking at the poll set
-	
 	int i = 0;
 	int returnValue = -1;
 	int pollValue = 0;
@@ -77,7 +76,6 @@ int pollCall(int timeInMilliSeconds)
 		perror("pollCall");
 		exit(-1);
 	}	
-			
 	// check to see if timeout occurred (poll returned 0)
 	if (pollValue > 0)
 	{
@@ -94,9 +92,7 @@ int pollCall(int timeInMilliSeconds)
 				break;
 			} 
 		}
-
 	}
-	
 	// Ready socket # or -1 if timeout/none
 	return returnValue;
 }

@@ -1,0 +1,7 @@
+Lam Tran
+ltran73@calpoly.edu
+Network 464
+
+make all
+./myServer
+./myCclient <host> <portnumber>

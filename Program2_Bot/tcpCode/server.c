@@ -10,13 +10,19 @@
 #include "networks.h"
 #include "cMessage.h"
 #include "pollLib.h"
+#include "sharedStuffs.h"
 
 
 #define MAXBUF 1024
 #define DEBUG_FLAG 1
 
+
+
+
 void addNewClient(int serverSocket);
-void processClient(int clientSocket);
+int processClient(int clientSocket, sClient **headClients);
+void serverControl(int serverSocket);
+int checkArgs(int argc, char *argv[]);
 
 int main(int argc, char *argv[])
 {
@@ -27,18 +33,23 @@ int main(int argc, char *argv[])
     serverSocket = tcpServerSetup(portNumber);
     serverControl(serverSocket);
 
-
+    int pduReceived;
     int socketReady = 0;
+    sClient *headClients = NULL;
+
     while (1) {
-        socketReady = poll(-1);   
+        socketReady = pollCall(-1);   
         if (socketReady == serverSocket)
         {
             addNewClient(socketReady);
         }    
         else {
-            processClient(socketReady);
+            pduReceived = processClient(socketReady, &headClients);
+            if (pduReceived == -1) {
+				removeFromPollSet(socketReady);
+				close(socketReady);
+			}
         }
-        printf("here\n");
     }
 
 
@@ -47,15 +58,14 @@ int main(int argc, char *argv[])
     return 0;
 }
 
-void processClient(int clientSocket) {
+int processClient(int clientSocket, sClient **headClients) {
     char buf[MAXBUF];
 	int messageLen = 0;
-	int sent = 0;
-	char exitStr[] = "exit";
+    int process_status;
 
 	//now get the data from the client_socket
 	messageLen = recvPDU(clientSocket, buf, MAXBUF);
-	if (messageLen < 0)
+    if (messageLen < 0)
 	{
 		perror("recv call");
 		exit(-1);
@@ -64,16 +74,16 @@ void processClient(int clientSocket) {
 		perror("closed connections");
 		return -1;
 	}
-	printf("Message received on socket %u, length: %d Data: %s\n", clientSocket, messageLen, buf);
-	sent =  sendPDU(clientSocket, buf, messageLen);
 
-	if (strcmp(buf, exitStr) == 0)
-	{
-		return -1;
-	}
-	// printf("Sent back %d\n", sent);
+    printf("PDU LENGTH: %d\n", buf[0] | buf[1]);
+    printf("Flag: %d\n", buf[2]);
+    printf("Received: %s Message Len %d\n", buf, messageLen);
 
-	return 0;
+    process_status = processClientPacket(clientSocket, buf, headClients);
+
+	
+    
+	return process_status;
 }
 
 void addNewClient(int serverSocket) {
