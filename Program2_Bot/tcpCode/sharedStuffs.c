@@ -25,6 +25,12 @@ int processServerPacket(int socketNumber, char *buf) {
         case DEFAULT_MESSAGE_FROM_SERVER:
         {
             printf("%s\n", buf + 3);
+            return DEFAULT_MESSAGE_FROM_SERVER;
+        }
+        case M_MESSAGE_ERROR_DESTINATION:
+        {
+            printf("Client with handle %s does not exist\n", buf + 4);
+            return M_MESSAGE_ERROR_DESTINATION;   
         }
         default:
         {
@@ -34,7 +40,7 @@ int processServerPacket(int socketNumber, char *buf) {
 }
 
 
-void MessageHandler(char * buf, sClient **headClients) {
+void MessageHandler(int clientSocket, char * buf, sClient **headClients) {
 
     int lengthSender = buf[3];
     char *senderHandle = buf + 4;
@@ -56,11 +62,23 @@ void MessageHandler(char * buf, sClient **headClients) {
         forwardStatus = ForwardMessage(senderHandle, destinations[i], temp, headClients);
         if (forwardStatus < 0 ) {
             //this means could not find a destination so send error message
-            printf("CLIENT %s does not exist\n", destinations[i]);
+            HandleDoesNotExist(clientSocket,senderHandle, destinations[i]);
         }
     }
     printf("done processing message buffer\n");
     
+}
+
+void HandleDoesNotExist(int senderSocket, char *senderHandle, char *destinationHandle)
+{
+    int bufferSize = 4 + strlen(destinationHandle) + 1; // 3 for header and 1 for length of handle and 1 for null terminator
+    char sendBuf[bufferSize];
+    memcpy(sendBuf,(uint8_t*)&(bufferSize),2);
+    sendBuf[PACKET_FLAG_INDEX] = M_MESSAGE_ERROR_DESTINATION;
+    sendBuf[3] = strlen(senderHandle + 1);
+    strcpy(sendBuf + 4, destinationHandle);
+    sendBuf[bufferSize - 1] = '\0';
+    sendPDU(senderSocket, sendBuf, bufferSize);
 }
 
 int ForwardMessage(char *senderHandle, char *destinationHandle, char *message, sClient **headClients) {
@@ -118,11 +136,11 @@ int processClientPacket(int socketNumber, char * buf, sClient **headClients){
                 int handleFound = 0;
                 sClient *p = *headClients;
                 
-                printf("HandleName %s\n", handleName);
-                printf("before while loop \n");
+                // printf("HandleName %s\n", handleName);
+                // printf("before while loop \n");
                 while (p->next)  //create client
                 {
-                    printf("P -> %s\n", p->handle);
+                    // printf("P -> %s\n", p->handle);
                     if (strcmp(p->handle, handleName) == 0) {
                         printf("Client already existed. Choose a different handle name\n");
                         handleFound = 1;
@@ -132,7 +150,7 @@ int processClientPacket(int socketNumber, char * buf, sClient **headClients){
                     }
                     p = p->next;
                 }
-                printf("after while loop \n");
+                // printf("after while loop \n");
                 // check the last node as well since the while loop wouldn't check it
                 if (strcmp(p->handle, handleName) == 0 && handleFound == 0) {
                     printf("Client already existed. Choose a different handle name\n");
@@ -144,7 +162,7 @@ int processClientPacket(int socketNumber, char * buf, sClient **headClients){
 
                 // CREATE A NEW HANDLER
                 if (handleFound == 0) {
-                    printf("Creating a new handle \n");
+                    // printf("Creating a new handle \n");
                     sClient *temp = malloc(sizeof(sClient));
                     temp->flag = INITIAL_PACKET;
                     temp->handle = handleName;
@@ -152,7 +170,7 @@ int processClientPacket(int socketNumber, char * buf, sClient **headClients){
                     temp->socket = socketNumber;
                     temp->next = NULL;
                     p->next = temp;
-                    printf("Client created %s\n", p->next->handle);
+                    // printf("Client created %s\n", p->next->handle);
                 }
             }
             int returnSent = sendPDU(socketNumber, returnBuf, 3);
@@ -172,7 +190,7 @@ int processClientPacket(int socketNumber, char * buf, sClient **headClients){
         }
         case M_MESSAGE:
         {
-            MessageHandler(buf, headClients);
+            MessageHandler(socketNumber,buf, headClients);
         }
         default:
             printf("Default with flag %d\n", flag);

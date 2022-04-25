@@ -53,7 +53,7 @@ int main(int argc, char * argv[])
     char *clientHandleName = malloc(sizeof(char) * (senderLength + 1)); //add one to take account for that '\0'
     memcpy(clientHandleName,argv[1],senderLength);
     clientHandleName[senderLength] = '\0';
-    printf("ClientHandleName %s\n", clientHandleName);
+    // printf("ClientHandleName %s\n", clientHandleName);
     
 
 
@@ -156,7 +156,7 @@ int sendInputAsPacket(int socketNum, char * buffer, int senderLength, char * sen
 		uint8_t bufferLength[2];
         char *allHandles[handleAmount];
         char *currentHandle;
-        printf("Handle Amount is %i\n", handleAmount);
+        // printf("Handle Amount is %i\n", handleAmount);
 		
 		int offsetMessages = handleAmount + 1 + 4; //this is the offset to account for spaces and first 4 bytes of command
 
@@ -167,35 +167,35 @@ int sendInputAsPacket(int socketNum, char * buffer, int senderLength, char * sen
 			pduSize = pduSize + strlen(currentHandle) + 2; //add two here to account for terminator byte and length of destination byte
 			offsetMessages = offsetMessages + strlen(currentHandle);
 			// printf("Token: %s with length %d\n",currentHandle, strlen(currentHandle));
-            printf("Token2: %s with length2 %d\n",allHandles[i], strlen(allHandles[i]));
+            // printf("Token2: %s with length2 %d\n",allHandles[i], strlen(allHandles[i]));
         }
 		
 		char *messageToSend = buffer + offsetMessages;
 		pduSize = pduSize + strlen(messageToSend) + 1; //plus one here to account for null terminator at the end
 
 
-		printf("Message to send %s with length = %d\n", messageToSend, strlen(messageToSend));
+		// printf("Message to send %s with length = %d\n", messageToSend, strlen(messageToSend));
 		// printf("REMAINDER MESSAGE = %s\n", buffer+offsetMessages);
 
 		//now create the buffer to send since we know the pdusize already
 		uint8_t pduPacket[pduSize];
 		memcpy(bufferLength,(uint8_t*)&(pduSize),2);
-		printf("Line 177 \n");
+		// printf("Line 177 \n");
 		uint8_t *p = pduPacket + 3; //points starting at length of sender
-		printf("Line 179 \n");
+		// printf("Line 179 \n");
 		// memcpy(pduPacket, (uint8_t)&(pduSize),2);
-		printf("Line 181 \n");
+		// printf("Line 181 \n");
 		//setting up header
 		pduPacket[1] = bufferLength[0];
 		pduPacket[0] = bufferLength[1];
 		pduPacket[PACKET_FLAG_INDEX] = M_MESSAGE;
 
-		printf("Line 182\n");
+		// printf("Line 182\n");
 		*p = senderLength;
-		printf("P sender Length %d\n", *p);
+		// printf("P sender Length %d\n", *p);
 		p = p + 1; //move on to the starting of sender handle byte
 		strcpy(p, senderHandle);
-		printf("P sender handle %s\n", pduPacket + 4);
+		// printf("P sender handle %s\n", pduPacket + 4);
 		p = p + senderLength;
 		*p = handleAmount;
 		for (int i = 0; i < handleAmount; i++) {
@@ -203,13 +203,13 @@ int sendInputAsPacket(int socketNum, char * buffer, int senderLength, char * sen
 			*p = strlen(allHandles[i]) + 1; // set destination handle length
 			p = p + 1;
 			strcpy(p,allHandles[i]);
-			printf("Copying allHandles %s with length of %d", allHandles[i], strlen(allHandles[i]));
+			// printf("Copying allHandles %s with length of %d", allHandles[i], strlen(allHandles[i]));
 			p = p + strlen(allHandles[i]); //move up for terminator byte 
 			*p = '\0'; //set terminator byte
 		}
 		p = p + 1; //move up for beginning of sending messages
 		strcpy(p,messageToSend);	
-		printf("Message to send = %s\n", p);
+		// printf("Message to send = %s\n", p);
 
 		// now send this created package to server
 		int sent = sendPDU(socketNum, pduPacket, pduSize);
@@ -233,11 +233,11 @@ int sendToServer(int socketNum, int senderLength, char *senderHandle)
 	int sendLen = 0;        //amount of data to send
 	int sent = 0;            //actual amount of data sent/* get the data and send it   */
 	char exitStr[] = "exit";
-    printf("Going to readinput now \n");
+    // printf("Going to readinput now \n");
 	sendLen = readFromStdin(stdBuf);
 
     sendInputAsPacket(socketNum, stdBuf, senderLength, senderHandle);
-	printf("read: %s string len: %d (including null)\n", stdBuf, sendLen);
+	// printf("read: %s string len: %d (including null)\n", stdBuf, sendLen);
 	
 	// sent =  sendPDU(socketNum, sendBuf, sendLen);
     char listBuff[3];
@@ -252,7 +252,7 @@ int sendToServer(int socketNum, int senderLength, char *senderHandle)
 		exit(-1);
 	}
 
-	printf("Amount of data sent is: %d\n", sent);
+	// printf("Amount of data sent is: %d\n", sent);
 	// receiveLength = recvPDU(socketNum, sendBuf, sent);
 	// printf("Received buffer %s\n", sendBuf);
 	if (strcmp(stdBuf, exitStr) == 0) {

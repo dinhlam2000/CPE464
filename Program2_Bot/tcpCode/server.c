@@ -75,9 +75,9 @@ int processClient(int clientSocket, sClient **headClients) {
 		return -1;
 	}
 
-    printf("PDU LENGTH: %d\n", buf[0] | buf[1]);
-    printf("Flag: %d\n", buf[2]);
-    printf("Received: %s Message Len %d\n", buf, messageLen);
+    // printf("PDU LENGTH: %d\n", buf[0] | buf[1]);
+    // printf("Flag: %d\n", buf[2]);
+    // printf("Received: %s Message Len %d\n", buf, messageLen);
 
     process_status = processClientPacket(clientSocket, buf, headClients);
 
