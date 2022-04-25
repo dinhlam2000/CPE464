@@ -73,9 +73,12 @@ int main(int argc, char * argv[])
 			// Receiv pdu and print it out
 			// printf("Socket Readyy for server= %d \n", socketReady);
 			pduReturned = processServer(socketReady);
-            if (pduReturned == NEGATIVE_INITIAL_PACKET) {
+            if ((pduReturned == NEGATIVE_INITIAL_PACKET)) {
                 break;
             }
+			else if (pduReturned == ACK_EXITING) {
+				break;
+			}
 		}
 		else {
 			// printf("Socket Readyy = %d \n", socketReady);
@@ -217,6 +220,22 @@ int sendInputAsPacket(int socketNum, char * buffer, int senderLength, char * sen
 		// free(pduPacket);
     }
 
+	else if (strcmp(tokenSplit, "%L") == 0){
+		uint8_t pduPacket[3];
+		int pduLength = 3;
+		memcpy(pduPacket,(uint8_t*)&(pduLength),2);
+		pduPacket[PACKET_FLAG_INDEX] = LIST_HANDLES;
+		int sent = sendPDU(socketNum,pduPacket,pduLength);
+		return sent;
+	}
+	else if (strcmp(tokenSplit, "%E") == 0) {
+		uint8_t pduPacket[3];
+		int pduLength = 3;
+		memcpy(pduPacket, (uint8_t*)&(pduLength),2);
+		pduPacket[PACKET_FLAG_INDEX] = CLIENT_EXITING;
+		int sent = sendPDU(socketNum, pduPacket, pduLength);
+		return sent;
+	}
 
     // while (tokenSplit != NULL) {
     //     printf("%s \n", tokenSplit);
@@ -240,11 +259,11 @@ int sendToServer(int socketNum, int senderLength, char *senderHandle)
 	// printf("read: %s string len: %d (including null)\n", stdBuf, sendLen);
 	
 	// sent =  sendPDU(socketNum, sendBuf, sendLen);
-    char listBuff[3];
-    listBuff[0] = '\0';
-    listBuff[1] = '\1';
-    listBuff[2] = LIST_HANDLES;
-    sent = sendPDU(socketNum,listBuff, 3 );
+    // char listBuff[3];
+    // listBuff[0] = '\0';
+    // listBuff[1] = '\1';
+    // listBuff[2] = LIST_HANDLES;
+    // sent = sendPDU(socketNum,listBuff, 3 );
 	
 	if (sent < 0)
 	{
