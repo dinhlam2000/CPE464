@@ -22,11 +22,69 @@ int processServerPacket(int socketNumber, char *buf) {
             printf("NEGATIVE INITIAL PACKET\n");
             return NEGATIVE_INITIAL_PACKET;
         }
+        case DEFAULT_MESSAGE_FROM_SERVER:
+        {
+            printf("%s\n", buf + 3);
+        }
         default:
         {
-            return -1;
+            return DEFAULT_MESSAGE_FROM_SERVER;
         }
     }
+}
+
+
+void MessageHandler(char * buf, sClient **headClients) {
+
+    int lengthSender = buf[3];
+    char *senderHandle = buf + 4;
+    int numDestinations = buf[4 + lengthSender];
+
+    char *destinations[numDestinations];
+    char * temp = buf + 4 + lengthSender + 1;
+    char *message;
+    int currentDestinationHandleLength;
+    for (int i = 0; i < numDestinations; i++) {
+        currentDestinationHandleLength = *temp;
+        destinations[i] = temp + 1;
+        temp = temp + currentDestinationHandleLength + 1; //+1 to account for null terminator 
+    }
+    //now we got all the destinations stored in destinations
+    // now temp should point at beginning of messages
+    int forwardStatus;
+    for (int i = 0; i < numDestinations; i ++) {
+        forwardStatus = ForwardMessage(senderHandle, destinations[i], temp, headClients);
+        if (forwardStatus < 0 ) {
+            //this means could not find a destination so send error message
+            printf("CLIENT %s does not exist\n", destinations[i]);
+        }
+    }
+    printf("done processing message buffer\n");
+    
+}
+
+int ForwardMessage(char *senderHandle, char *destinationHandle, char *message, sClient **headClients) {
+
+    sClient *p = *headClients;
+    
+    
+    while (p) {
+        //check to see if we have a handle in all clients that match with destination handle
+        if (strcmp(destinationHandle,p->handle) == 0) {
+            int messageLength = strlen(message) + 1;
+            int bufferSize = messageLength + strlen(senderHandle) + 2 + 3; //accounts for length sender handle and 2 because of colon and space and the 3 is for header
+            char sendBuf[bufferSize];
+            memcpy(sendBuf,(uint8_t*)&(bufferSize),2);
+            sendBuf[PACKET_FLAG_INDEX] = DEFAULT_MESSAGE_FROM_SERVER; 
+            strcpy(sendBuf + 3, senderHandle);
+            strcat(sendBuf + 3, ": ");
+            strcat(sendBuf + 3, message);
+            int sent = sendPDU(p->socket, sendBuf, bufferSize);
+            return 0; //successfully sent
+        }
+        p = p->next;
+    }
+    return -1; //unable to find a destination handle with that name
 }
 
 
@@ -111,6 +169,10 @@ int processClientPacket(int socketNumber, char * buf, sClient **headClients){
                 p = p->next;
             }
             return SUCCESS_PROCESS_PACKET;
+        }
+        case M_MESSAGE:
+        {
+            MessageHandler(buf, headClients);
         }
         default:
             printf("Default with flag %d\n", flag);

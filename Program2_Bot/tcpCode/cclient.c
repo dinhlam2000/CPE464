@@ -126,7 +126,9 @@ int processServer(int socketNumber) {
 	int receiveLength;
 	receiveLength = recvPDU(socketNumber, buf, MAXBUF);
     int process_status = processServerPacket(socketNumber, buf);
-	// printf("Message Received from server: %s\n", buf);
+	// if (process_status == DEFAULT_MESSAGE_FROM_SERVER) {
+	// 	printf("%s\n", buf);
+	// }
     return process_status;
 }
 
@@ -187,7 +189,7 @@ int sendInputAsPacket(int socketNum, char * buffer, int senderLength, char * sen
 		pduPacket[1] = bufferLength[0];
 		pduPacket[0] = bufferLength[1];
 		pduPacket[PACKET_FLAG_INDEX] = M_MESSAGE;
-		
+
 		printf("Line 182\n");
 		*p = senderLength;
 		printf("P sender Length %d\n", *p);
