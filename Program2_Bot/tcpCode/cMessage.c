@@ -33,12 +33,12 @@ int recvPDU(int clientSocket, uint8_t * dataBuffer, int bufferLen) {
 	int messageLen = 0;
     int pduLen = 0;
 
-    char pduHeader[2];
+    uint8_t pduHeader[2];
 	//now get the data from the client_socket
 
 
     pduLen = recv(clientSocket, pduHeader, 2, MSG_WAITALL);
-    int  pduPayloadLength = pduHeader[0] | pduHeader[1];
+    unsigned int pduPayloadLength = pduHeader[0] | pduHeader[1];
     if (pduLen < 0)
 	{
 		perror("recv call error");

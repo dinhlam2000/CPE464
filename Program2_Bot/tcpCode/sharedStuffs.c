@@ -1,35 +1,29 @@
 #include "sharedStuffs.h"
 
-void SendPacket(u_int8_t flag) {
-    switch (flag) {
-        case INITIAL_PACKET:
-            printf("Initial Packet\n");
-        default:
-            printf("Default\n");
-    }
-}
 
 int processServerPacket(int socketNumber, char *buf) {
     uint8_t flag = buf[2];
     switch (flag) {
         case POSITIVE_INITIAL_PACKET:
         {
-            printf("POSITIVE INITIAL PACKET\n");
+            // printf("POSITIVE INITIAL PACKET\n");
             return POSITIVE_INITIAL_PACKET;
         }
         case NEGATIVE_INITIAL_PACKET:
         {
-            printf("NEGATIVE INITIAL PACKET\n");
+            // printf("NEGATIVE INITIAL PACKET\n");
             return NEGATIVE_INITIAL_PACKET;
         }
         case DEFAULT_MESSAGE_FROM_SERVER:
         {
-            printf("%s\n", buf + 3);
+            printf("\n%s\n", buf + 3);
+            PrintDollarSign();
             return DEFAULT_MESSAGE_FROM_SERVER;
         }
         case M_MESSAGE_ERROR_DESTINATION:
         {
-            printf("Client with handle %s does not exist\n", buf + 4);
+            printf("\nClient with handle %s does not exist\n", buf + 4);
+            PrintDollarSign();
             return M_MESSAGE_ERROR_DESTINATION;   
         }
         case ACK_EXITING:
@@ -38,13 +32,18 @@ int processServerPacket(int socketNumber, char *buf) {
         }
         case LIST_HANDLES_AMOUNT:
         {
-            printf("Number of clients: %i\n", buf[3]);
+            printf("\nNumber of clients: %i\n", buf[3]);
             return LIST_HANDLES_AMOUNT;;
         }
         case HANDLE_RETURN:
         {   
             printf("\t%s\n", buf+4);
             return HANDLE_RETURN;
+        }
+        case ALL_HANDLES_RETURN:
+        {
+            PrintDollarSign();
+            return ALL_HANDLES_RETURN;
         }
         default:
         {
@@ -128,7 +127,7 @@ void MessageHandler(int clientSocket, char * buf, sClient **headClients) {
             HandleDoesNotExist(clientSocket,senderHandle, destinations[i]);
         }
     }
-    printf("done processing message buffer\n");
+    // printf("done processing message buffer\n");
     
 }
 
@@ -193,7 +192,29 @@ int RemoveClient_Socket(int socketNumber, sClient **headClients) {
 }
 
 
+void BroadCastHandler(int socketNumber, char * buf,sClient **headClients) {
+    sClient *p = *headClients;
+    char *senderHandle = buf + 4;
+    char *broadCastMessage = buf + 4 + buf[3]; //this is to account for offset to get to the index of broadcast messages in the packet
+    while (p) {
+        if (p->socket != socketNumber)
+        {
+            int messageLength = strlen(broadCastMessage) + 1;   
+            int bufferSize = messageLength + strlen(senderHandle) + 2 + 3; //accounts for length sender handle and 2 because of colon and space and the 3 is for header
+            char sendBuf[bufferSize];
+            memcpy(sendBuf,(uint8_t*)&(bufferSize),2);
+            sendBuf[PACKET_FLAG_INDEX] = DEFAULT_MESSAGE_FROM_SERVER; 
+            strcpy(sendBuf + 3, senderHandle);
+            strcat(sendBuf + 3, ": ");
+            strcat(sendBuf + 3, broadCastMessage);
+            int sent = sendPDU(p->socket, sendBuf, bufferSize);
+        }
+        
 
+        p = p->next;
+    }   
+
+}
 
 int processClientPacket(int socketNumber, char * buf, sClient **headClients){
 
@@ -209,7 +230,7 @@ int processClientPacket(int socketNumber, char * buf, sClient **headClients){
             returnBuf[2] = POSITIVE_INITIAL_PACKET;
 
 
-            printf("-----------Processing Inital Packet------------\n");
+            // printf("-----------Processing Inital Packet------------\n");
             char * handleName = malloc(sizeof(char) * buf[3]);
             memcpy(handleName,buf+4,buf[3]);
             if (*headClients == NULL) {
@@ -231,7 +252,7 @@ int processClientPacket(int socketNumber, char * buf, sClient **headClients){
                 {
                     // printf("P -> %s\n", p->handle);
                     if (strcmp(p->handle, handleName) == 0) {
-                        printf("Client already existed. Choose a different handle name\n");
+                        // printf("Hanlde already in use: %s\n", handleName);
                         handleFound = 1;
                         free(handleName);
                         returnBuf[2] = NEGATIVE_INITIAL_PACKET;
@@ -242,7 +263,7 @@ int processClientPacket(int socketNumber, char * buf, sClient **headClients){
                 // printf("after while loop \n");
                 // check the last node as well since the while loop wouldn't check it
                 if (strcmp(p->handle, handleName) == 0 && handleFound == 0) {
-                    printf("Client already existed. Choose a different handle name\n");
+                    // printf("Hanlde already in use: %s\n", handleName);
                     handleFound = 1;
                     free(handleName);
                     returnBuf[2] = NEGATIVE_INITIAL_PACKET;
@@ -263,7 +284,7 @@ int processClientPacket(int socketNumber, char * buf, sClient **headClients){
                 }
             }
             int returnSent = sendPDU(socketNumber, returnBuf, 3);
-            printf("Initial packet Finished!\n");
+            // printf("Initial packet Finished!\n");
             return status;
         }
         
@@ -276,6 +297,11 @@ int processClientPacket(int socketNumber, char * buf, sClient **headClients){
         {
             MessageHandler(socketNumber,buf, headClients);
             return M_MESSAGE;
+        }
+        case BROADCAST_PACKET:
+        {
+            BroadCastHandler(socketNumber, buf, headClients);
+            return BROADCAST_PACKET;
         }
         case CLIENT_EXITING:
         {
@@ -290,7 +316,7 @@ int processClientPacket(int socketNumber, char * buf, sClient **headClients){
             }
         }
         default:
-            printf("Default with flag %d\n", flag);
+            // printf("Default with flag %d\n", flag);
             return SUCCESS_PROCESS_PACKET;
     }
 }

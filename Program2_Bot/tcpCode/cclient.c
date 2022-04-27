@@ -16,13 +16,14 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <netdb.h>
+#include <ctype.h>
 
 #include "networks.h"
 #include "cMessage.h"
 #include "pollLib.h"
 #include "sharedStuffs.h"
 
-#define MAXBUF 1024
+#define MAXBUF 1400
 #define DEBUG_FLAG 1
 
 
@@ -34,21 +35,25 @@ int processServer(int socketNumber);
 int sendInitialPacket(char * handleName, int serverSocket);
 int sendInputAsPacket(int socketNum, char * buffer, int senderLength, char *senderHandle);
 
-#define PrintDollarSign() do {\
-                            printf("$: ");\
-                            fflush(stdout);\
-                            } while(0)
-
 int main(int argc, char * argv[])
 {
     checkArgs(argc, argv);
 
 	int socketNum = 0;         //socket descriptor
-	char * pduSend;
+	int pduSend;
 	int socketReady = 0;
 	int pduReturned;
 
 	int senderLength = strlen(argv[1]);
+	if (isdigit(argv[1][0])) {
+		printf("Invalid handle, handle starts with a number\n");
+		exit(-1);
+	}
+ 	else if (senderLength > 100) {
+		printf("Invalid handle, handle longer than 100 characters: %s\n", argv[1]);
+		exit(-1);
+	}
+
 
     char *clientHandleName = malloc(sizeof(char) * (senderLength + 1)); //add one to take account for that '\0'
     memcpy(clientHandleName,argv[1],senderLength);
@@ -64,6 +69,8 @@ int main(int argc, char * argv[])
     senderLength = sendInitialPacket(argv[1], socketNum);
 	// pduSend = sendToServer(socketNum);
 
+	PrintDollarSign();
+
 	while (1) {
 		// printf("Blocking\n");
 		socketReady = pollCall(-1);
@@ -71,21 +78,29 @@ int main(int argc, char * argv[])
 		if (socketReady == socketNum)
 		{
 			// Receiv pdu and print it out
-			// printf("Socket Readyy for server= %d \n", socketReady);
 			pduReturned = processServer(socketReady);
+
+			// printf("FLAG RETURNED FROM SERVER %d", pduReturned);
             if ((pduReturned == NEGATIVE_INITIAL_PACKET)) {
+				printf("Handle already in use: %s\n", clientHandleName);
                 break;
             }
 			else if (pduReturned == ACK_EXITING) {
 				break;
 			}
+			else if (pduReturned == -1) {
+				printf("Server Terminated\n");
+				break;
+			}
 		}
 		else {
 			// printf("Socket Readyy = %d \n", socketReady);
+			// fprintf(0, "$: ");
+			
 
 			pduSend = sendToServer(socketNum, senderLength, clientHandleName);
-			if (pduSend == -1) {
-				// close(socketReady);
+			PrintDollarSign();
+			if (pduSend < 0) {
 				break;
 			}
 		}
@@ -128,7 +143,13 @@ int processServer(int socketNumber) {
 	char buf[MAXBUF];
 	int receiveLength;
 	receiveLength = recvPDU(socketNumber, buf, MAXBUF);
+	if (receiveLength == 0) {
+		//server terminated
+		return -1;
+	}
+	// printf("Received Buffer %s\n", buf);
     int process_status = processServerPacket(socketNumber, buf);
+	// printf("Process status %i\n", process_status);
 	// if (process_status == DEFAULT_MESSAGE_FROM_SERVER) {
 	// 	printf("%s\n", buf);
 	// }
@@ -147,14 +168,27 @@ int sendInputAsPacket(int socketNum, char * buffer, int senderLength, char * sen
     char space[2] = " ";
     tokenSplit = strtok(buffer, space);
     int pduSize = 4 + senderLength; //initially it has this to account for Header(3bytes) + senderLength(1byte) + lengthOfSenderHandle
-    PrintDollarSign();
+    // PrintDollarSign();
 	// printf("Buffer Message %s\n", buffer + 19);
 
 
     // MESSAGE COMMAND
-    if (strcmp(tokenSplit, "%M") == 0 ) {
+    if ((strcmp(tokenSplit, "%M") == 0) || strcmp(tokenSplit, "%m") == 0) {
         pduSize = pduSize + 1; //+1 here to account for 1 byte of NUMBER OF HANDLES
-        uint8_t handleAmount = atoi(strtok(NULL, space));
+		char *handleInput = strtok(NULL,space);
+		if (!handleInput) {
+			printf("Invalid command format\n");
+			return 0;
+		}
+        int handleAmount = atoi(handleInput);
+		if (!handleAmount) {
+			printf("Invalid command format\n");
+			return 0;
+		}
+		if (handleAmount > 9) {
+			printf("Number of handles must be between 1-9\n");
+			return 0;
+		}
 		
 		uint8_t bufferLength[2];
         char *allHandles[handleAmount];
@@ -220,7 +254,54 @@ int sendInputAsPacket(int socketNum, char * buffer, int senderLength, char * sen
 		// free(pduPacket);
     }
 
-	else if (strcmp(tokenSplit, "%L") == 0){
+	else if ( (strcmp(tokenSplit, "%B") == 0) || (strcmp(tokenSplit, "%b") == 0) ) {
+		char * messageToSend = buffer + 3;
+		int messageLength = strlen(messageToSend);
+		int breakup= 0;
+		//have to break up in multiple packets
+		if (messageLength > 200)
+		{
+			breakup = messageLength / 200;
+			messageLength = 200;
+			printf("Break up %i\n", breakup);
+		}
+		pduSize = pduSize + messageLength + 1;
+		uint8_t pduPacket[pduSize];
+		uint8_t bufferLength[2];
+		memcpy(bufferLength, (uint8_t*)&(pduSize), 2);
+		pduPacket[0] = bufferLength[1];
+		pduPacket[1] = bufferLength[0];
+		pduPacket[PACKET_FLAG_INDEX] = BROADCAST_PACKET;
+		pduPacket[3] = senderLength;
+		strcpy(pduPacket + 4, senderHandle);
+		int sent = 0;
+		if (breakup > 0)
+		{
+			for (int i = 0; i <= breakup; i++) 
+			{
+				if (i != breakup)
+				{
+					strncpy(pduPacket + 4 + senderLength, messageToSend,200);
+					pduPacket[pduSize - 1] = '\0';
+					sent += sendPDU(socketNum, pduPacket, pduSize);
+					messageToSend = messageToSend + 200;
+				}
+				else {
+					strcpy(pduPacket + 4 + senderLength, messageToSend);
+					pduSize = pduSize - (200 - strlen(messageToSend));
+					sent += sendPDU(socketNum, pduPacket, pduSize);
+				}
+			}
+		}
+		else {
+			strcpy(pduPacket + 4 + senderLength, messageToSend);
+			sent += sendPDU(socketNum, pduPacket, pduSize);
+		}
+		
+		return sent;
+
+	}
+	else if ((strcmp(tokenSplit, "%L") == 0) || (strcmp(tokenSplit, "%l") == 0)){
 		uint8_t pduPacket[3];
 		int pduLength = 3;
 		memcpy(pduPacket,(uint8_t*)&(pduLength),2);
@@ -228,7 +309,7 @@ int sendInputAsPacket(int socketNum, char * buffer, int senderLength, char * sen
 		int sent = sendPDU(socketNum,pduPacket,pduLength);
 		return sent;
 	}
-	else if (strcmp(tokenSplit, "%E") == 0) {
+	else if ((strcmp(tokenSplit, "%E") == 0) || (strcmp(tokenSplit, "%e") == 0)) {
 		uint8_t pduPacket[3];
 		int pduLength = 3;
 		memcpy(pduPacket, (uint8_t*)&(pduLength),2);
@@ -236,7 +317,9 @@ int sendInputAsPacket(int socketNum, char * buffer, int senderLength, char * sen
 		int sent = sendPDU(socketNum, pduPacket, pduLength);
 		return sent;
 	}
-
+	else{
+		printf("Invalid command\n");
+	}
     // while (tokenSplit != NULL) {
     //     printf("%s \n", tokenSplit);
     //     tokenSplit = strtok(NULL, space);
@@ -251,9 +334,12 @@ int sendToServer(int socketNum, int senderLength, char *senderHandle)
 	char stdBuf[MAXBUF];   //data buffer
 	int sendLen = 0;        //amount of data to send
 	int sent = 0;            //actual amount of data sent/* get the data and send it   */
-	char exitStr[] = "exit";
     // printf("Going to readinput now \n");
 	sendLen = readFromStdin(stdBuf);
+	if (sendLen > MAXBUF) {
+		printf("Too long of an input. Max is 1400 characters including (command, handles and text)\n");
+		return 0;
+	}
 
     sendInputAsPacket(socketNum, stdBuf, senderLength, senderHandle);
 	// printf("read: %s string len: %d (including null)\n", stdBuf, sendLen);
@@ -274,9 +360,7 @@ int sendToServer(int socketNum, int senderLength, char *senderHandle)
 	// printf("Amount of data sent is: %d\n", sent);
 	// receiveLength = recvPDU(socketNum, sendBuf, sent);
 	// printf("Received buffer %s\n", sendBuf);
-	if (strcmp(stdBuf, exitStr) == 0) {
-		return -1;
-	}
+	
 	return 0;
 }
 
@@ -299,7 +383,7 @@ int readFromStdin(char * buffer)
 		}
 	}
 
-    PrintDollarSign();
+    // PrintDollarSign();
 
 	
 	// Null terminate the string

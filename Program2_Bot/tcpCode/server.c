@@ -62,7 +62,7 @@ int processClient(int clientSocket, sClient **headClients) {
     char buf[MAXBUF];
 	int messageLen = 0;
     int process_status;
-
+    // printf("Processing client %u", clientSocket);
 	//now get the data from the client_socket
 	messageLen = recvPDU(clientSocket, buf, MAXBUF);
     if (messageLen < 0)
@@ -71,7 +71,8 @@ int processClient(int clientSocket, sClient **headClients) {
 		exit(-1);
 	}
 	else if (messageLen == 0) {
-		perror("closed connections");
+		// perror("closed connections");
+        RemoveClient_Socket(clientSocket, headClients);
 		return -1;
 	}
 
