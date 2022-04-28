@@ -23,7 +23,7 @@
 #include "pollLib.h"
 #include "sharedStuffs.h"
 
-#define MAXBUF 1400
+
 #define DEBUG_FLAG 1
 
 

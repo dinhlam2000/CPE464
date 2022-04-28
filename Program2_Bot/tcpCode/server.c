@@ -13,7 +13,7 @@
 #include "sharedStuffs.h"
 
 
-#define MAXBUF 1024
+// #define MAXBUF 1024
 #define DEBUG_FLAG 1
 
 
@@ -80,7 +80,7 @@ int processClient(int clientSocket, sClient **headClients) {
     // printf("Flag: %d\n", buf[2]);
     // printf("Received: %s Message Len %d\n", buf, messageLen);
 
-    process_status = processClientPacket(clientSocket, buf, headClients);
+    process_status = processClientPacket(clientSocket, buf, messageLen, headClients);
 
 	
     

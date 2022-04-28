@@ -14,12 +14,24 @@ int processServerPacket(int socketNumber, char *buf) {
             // printf("NEGATIVE INITIAL PACKET\n");
             return NEGATIVE_INITIAL_PACKET;
         }
-        case DEFAULT_MESSAGE_FROM_SERVER:
+        case BROADCAST_PACKET:
         {
-            printf("\n%s\n", buf + 1);
+            BroadCastHandlerClient(buf);
             PrintDollarSign();
-            return DEFAULT_MESSAGE_FROM_SERVER;
+            return BROADCAST_PACKET;
         }
+        case M_MESSAGE:
+        {
+            MessageHandlerClient(buf);
+            PrintDollarSign();
+            return M_MESSAGE;
+        }
+        // case DEFAULT_MESSAGE_FROM_SERVER:
+        // {
+        //     printf("\n%s\n", buf + 1);
+        //     PrintDollarSign();
+        //     return DEFAULT_MESSAGE_FROM_SERVER;
+        // }
         case M_MESSAGE_ERROR_DESTINATION:
         {
             printf("\nClient with handle %s does not exist\n", buf + 2);
@@ -107,16 +119,12 @@ void SendHandle(int clientSocket, char *handle) {
     sendPDU(clientSocket, pduHandle, bufferSize);
 }
 
-
-void MessageHandler(int clientSocket, char * buf, sClient **headClients) {
-
+void MessageHandlerServer(int clientSocket, char * buf, int bufferSize, sClient **headClients) {
     int lengthSender = buf[1];
     char *senderHandle = buf + 2;
     int numDestinations = buf[2 + lengthSender];
-
     char *destinations[numDestinations];
     char * temp = buf + 2 + lengthSender + 1;
-    char *message;
     int currentDestinationHandleLength;
     for (int i = 0; i < numDestinations; i++) {
         currentDestinationHandleLength = *temp;
@@ -127,13 +135,36 @@ void MessageHandler(int clientSocket, char * buf, sClient **headClients) {
     // now temp should point at beginning of messages
     int forwardStatus;
     for (int i = 0; i < numDestinations; i ++) {
-        forwardStatus = ForwardMessage(senderHandle, destinations[i], temp, headClients);
+        forwardStatus = ForwardPacket(senderHandle, destinations[i], buf, bufferSize, headClients);
         if (forwardStatus < 0 ) {
             //this means could not find a destination so send error message
             HandleDoesNotExist(clientSocket,senderHandle, destinations[i]);
         }
     }
-    // printf("done processing message buffer\n");
+
+}
+
+void MessageHandlerClient(char * buf) {
+
+    int lengthSender = buf[1];
+    char *senderHandle = buf + 2;
+    int numDestinations = buf[2 + lengthSender];
+
+    // char *destinations[numDestinations];
+    char * temp = buf + 2 + lengthSender + 1;
+    int currentDestinationHandleLength;
+    for (int i = 0; i < numDestinations; i++) {
+        currentDestinationHandleLength = *temp;
+        // destinations[i] = temp + 1;
+        temp = temp + currentDestinationHandleLength + 1; //+1 to account for null terminator 
+    }
+    //now we got all the destinations stored in destinations
+    // now temp should point at beginning of messages
+    // int forwardStatus;
+    // for (int i = 0; i < numDestinations; i ++) {
+    //     forwardStatus = PrintMessage(senderHandle, destinations[i], temp, headClients);
+    // }
+    printf("\n%s: %s\n", senderHandle, temp);
     
 }
 
@@ -149,29 +180,43 @@ void HandleDoesNotExist(int senderSocket, char *senderHandle, char *destinationH
     sendPDU(senderSocket, sendBuf, bufferSize);
 }
 
-int ForwardMessage(char *senderHandle, char *destinationHandle, char *message, sClient **headClients) {
-
+int ForwardPacket(char *senderHandle, char *destinationHandle, char *buf, int bufferSize, sClient **headClients) {
     sClient *p = *headClients;
-    
-    
     while (p) {
         //check to see if we have a handle in all clients that match with destination handle
         if (strcmp(destinationHandle,p->handle) == 0) {
-            int messageLength = strlen(message) + 1;
-            int bufferSize = messageLength + strlen(senderHandle) + 2 + 1; //accounts for length sender handle and 2 because of colon and space and the 3 is for header
-            char sendBuf[bufferSize];
-            // memcpy(sendBuf,(uint8_t*)&(bufferSize),2);
-            sendBuf[PACKET_FLAG_INDEX] = DEFAULT_MESSAGE_FROM_SERVER; 
-            strcpy(sendBuf + 1, senderHandle);
-            strcat(sendBuf + 1, ": ");
-            strcat(sendBuf + 1, message);
-            int sent = sendPDU(p->socket, sendBuf, bufferSize);
+            int sent = sendPDU(p->socket, buf, bufferSize);
             return 0; //successfully sent
         }
         p = p->next;
     }
     return -1; //unable to find a destination handle with that name
 }
+
+// int PrintMessage(char *senderHandle, char *destinationHandle, char *message, sClient **headClients) {
+
+//     sClient *p = *headClients;
+    
+    
+//     while (p) {
+//         //check to see if we have a handle in all clients that match with destination handle
+//         if (strcmp(destinationHandle,p->handle) == 0) {
+//             int messageLength = strlen(message) + 1;
+//             int bufferSize = messageLength + strlen(senderHandle) + 2 + 1; //accounts for length sender handle and 2 because of colon and space and the 3 is for header
+//             char sendBuf[bufferSize];
+//             // memcpy(sendBuf,(uint8_t*)&(bufferSize),2);
+//             sendBuf[PACKET_FLAG_INDEX] = DEFAULT_MESSAGE_FROM_SERVER; 
+//             strcpy(sendBuf + 1, senderHandle);
+//             strcat(sendBuf + 1, ": ");
+//             strcat(sendBuf + 1, message);
+//             int sent = sendPDU(p->socket, sendBuf, bufferSize);
+//             return 0; //successfully sent
+//         }
+//         p = p->next;
+//     }
+//     return -1; //unable to find a destination handle with that name
+// }
+
 
 int RemoveClient_Socket(int socketNumber, sClient **headClients) {
     sClient *p = *headClients;
@@ -197,32 +242,29 @@ int RemoveClient_Socket(int socketNumber, sClient **headClients) {
     return -1;
 }
 
-
-void BroadCastHandler(int socketNumber, char * buf,sClient **headClients) {
-    sClient *p = *headClients;
+void BroadCastHandlerClient(char * buf) {
     char *senderHandle = buf + 2;
     char *broadCastMessage = buf + 2 + buf[1]; //this is to account for offset to get to the index of broadcast messages in the packet
+    printf("\n%s: %s\n", senderHandle, broadCastMessage);
+
+    
+}
+
+void BroadCastHandlerServer(int socketNumber, char * buf, int bufferSize, sClient **headClients) {
+    sClient *p = *headClients;
+    // char *senderHandle = buf + 2;
+    // char *broadCastMessage = buf + 2 + buf[1]; //this is to account for offset to get to the index of broadcast messages in the packet
     while (p) {
         if (p->socket != socketNumber)
         {
-            int messageLength = strlen(broadCastMessage) + 1;   
-            int bufferSize = messageLength + strlen(senderHandle) + 2 + 1; //accounts for length sender handle and 2 because of colon and space and the 3 is for header
-            char sendBuf[bufferSize];
-            memcpy(sendBuf,(uint8_t*)&(bufferSize),2);
-            sendBuf[PACKET_FLAG_INDEX] = DEFAULT_MESSAGE_FROM_SERVER; 
-            strcpy(sendBuf + 1, senderHandle);
-            strcat(sendBuf + 1, ": ");
-            strcat(sendBuf + 1, broadCastMessage);
-            int sent = sendPDU(p->socket, sendBuf, bufferSize);
+            int sent = sendPDU(p->socket, buf, bufferSize);
         }
-        
-
         p = p->next;
     }   
 
 }
 
-int processClientPacket(int socketNumber, char * buf, sClient **headClients){
+int processClientPacket(int socketNumber, char * buf, int bufferSize, sClient **headClients){
 
 
     uint8_t flag = buf[PACKET_FLAG_INDEX];
@@ -301,12 +343,12 @@ int processClientPacket(int socketNumber, char * buf, sClient **headClients){
         }
         case M_MESSAGE:
         {
-            MessageHandler(socketNumber,buf, headClients);
+            MessageHandlerServer(socketNumber,buf, bufferSize, headClients);
             return M_MESSAGE;
         }
         case BROADCAST_PACKET:
         {
-            BroadCastHandler(socketNumber, buf, headClients);
+            BroadCastHandlerServer(socketNumber, buf, bufferSize, headClients);
             return BROADCAST_PACKET;
         }
         case CLIENT_EXITING:
