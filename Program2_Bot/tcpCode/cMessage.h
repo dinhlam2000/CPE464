@@ -30,7 +30,7 @@
 #define HANDLE_RETURN 12
 #define ALL_HANDLES_RETURN 13
 
-#define PACKET_FLAG_INDEX 2
+#define PACKET_FLAG_INDEX 0
 
 
 int recvPDU(int clientSocket, uint8_t * dataBuffer, int bufferLen);

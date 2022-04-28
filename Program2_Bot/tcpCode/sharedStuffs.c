@@ -2,7 +2,7 @@
 
 
 int processServerPacket(int socketNumber, char *buf) {
-    uint8_t flag = buf[2];
+    uint8_t flag = buf[PACKET_FLAG_INDEX];
     switch (flag) {
         case POSITIVE_INITIAL_PACKET:
         {
@@ -16,13 +16,13 @@ int processServerPacket(int socketNumber, char *buf) {
         }
         case DEFAULT_MESSAGE_FROM_SERVER:
         {
-            printf("\n%s\n", buf + 3);
+            printf("\n%s\n", buf + 1);
             PrintDollarSign();
             return DEFAULT_MESSAGE_FROM_SERVER;
         }
         case M_MESSAGE_ERROR_DESTINATION:
         {
-            printf("\nClient with handle %s does not exist\n", buf + 4);
+            printf("\nClient with handle %s does not exist\n", buf + 2);
             PrintDollarSign();
             return M_MESSAGE_ERROR_DESTINATION;   
         }
@@ -32,12 +32,15 @@ int processServerPacket(int socketNumber, char *buf) {
         }
         case LIST_HANDLES_AMOUNT:
         {
-            printf("\nNumber of clients: %i\n", buf[3]);
+            uint32_t handleAmount;
+            memcpy(&handleAmount, buf+1, 4);
+
+            printf("\nNumber of clients: %i\n", ntohs(handleAmount));
             return LIST_HANDLES_AMOUNT;;
         }
         case HANDLE_RETURN:
         {   
-            printf("\t%s\n", buf+4);
+            printf("\t%s\n", buf+2);
             return HANDLE_RETURN;
         }
         case ALL_HANDLES_RETURN:
@@ -54,22 +57,25 @@ int processServerPacket(int socketNumber, char *buf) {
 
 void ListOfHandlesHandler(int clientSocket, sClient **headClients) {
     sClient *p = *headClients;
-    uint8_t totalClients = 0;
+    int totalClients = 0;
     
-    char pduNumHandles[4];
+    char pduNumHandles[5];
 
     // Get total amount of clients
     while (p) {
         totalClients++;
         p = p->next;
     }
-    pduNumHandles[0] = '\0';
-    pduNumHandles[1] = '\4';
+    // pduNumHandles[0] = '\0';
+    // pduNumHandles[1] = '\4';
     pduNumHandles[PACKET_FLAG_INDEX] = LIST_HANDLES_AMOUNT;
-    pduNumHandles[3] = totalClients;
+    uint8_t bufferLength [4];
+    totalClients = htons(totalClients);
+    memcpy(pduNumHandles + 1,(uint8_t*)&(totalClients),4);
+    int convertedTotalClients = ntohs(totalClients);
 
-    uint8_t bufferLength[2];
-    sendPDU(clientSocket, pduNumHandles, 4);
+    // uint8_t bufferLength[2];
+    sendPDU(clientSocket, pduNumHandles, 5);
     p = *headClients;
 
 
@@ -78,25 +84,25 @@ void ListOfHandlesHandler(int clientSocket, sClient **headClients) {
         p = p->next;
     }
 
-    char pduFinishedSendingHandles[3];
-    pduFinishedSendingHandles[0] = '\0';
-    pduFinishedSendingHandles[1] = '\3';
+    char pduFinishedSendingHandles[1];
+    // pduFinishedSendingHandles[0] = '\0';
+    // pduFinishedSendingHandles[1] = '\3';
     pduFinishedSendingHandles[PACKET_FLAG_INDEX] = ALL_HANDLES_RETURN;
-    sendPDU(clientSocket, pduFinishedSendingHandles, 3);
+    sendPDU(clientSocket, pduFinishedSendingHandles, 1);
 
 
 }
 
 void SendHandle(int clientSocket, char *handle) {
-    int bufferSize = strlen(handle) + 3 + 2; //3 for header and 1 for null terminator
+    int bufferSize = strlen(handle) + 1 + 2; //1 for flag and 1 for null terminator
     char pduHandle[bufferSize];
-    int bufferLength[2];
-    memcpy(bufferLength, (uint8_t*)&(bufferSize),2);
-    pduHandle[0] = bufferLength[1];
-    pduHandle[1] = bufferLength[0];
+    // int bufferLength[2];
+    // memcpy(bufferLength, (uint8_t*)&(bufferSize),2);
+    // pduHandle[0] = bufferLength[1];
+    // pduHandle[1] = bufferLength[0];
     pduHandle[PACKET_FLAG_INDEX] = HANDLE_RETURN;
-    pduHandle[3] = strlen(handle) + 1;
-    strcpy(pduHandle + 4, handle);
+    pduHandle[1] = strlen(handle) + 1;
+    strcpy(pduHandle + 2, handle);
     pduHandle[bufferSize - 1] = '\0';
     sendPDU(clientSocket, pduHandle, bufferSize);
 }
@@ -104,12 +110,12 @@ void SendHandle(int clientSocket, char *handle) {
 
 void MessageHandler(int clientSocket, char * buf, sClient **headClients) {
 
-    int lengthSender = buf[3];
-    char *senderHandle = buf + 4;
-    int numDestinations = buf[4 + lengthSender];
+    int lengthSender = buf[1];
+    char *senderHandle = buf + 2;
+    int numDestinations = buf[2 + lengthSender];
 
     char *destinations[numDestinations];
-    char * temp = buf + 4 + lengthSender + 1;
+    char * temp = buf + 2 + lengthSender + 1;
     char *message;
     int currentDestinationHandleLength;
     for (int i = 0; i < numDestinations; i++) {
@@ -133,12 +139,12 @@ void MessageHandler(int clientSocket, char * buf, sClient **headClients) {
 
 void HandleDoesNotExist(int senderSocket, char *senderHandle, char *destinationHandle)
 {
-    int bufferSize = 4 + strlen(destinationHandle) + 1; // 3 for header and 1 for length of handle and 1 for null terminator
+    int bufferSize = 2 + strlen(destinationHandle) + 1; // 2 for header and 1 for length of handle and 1 for null terminator
     char sendBuf[bufferSize];
-    memcpy(sendBuf,(uint8_t*)&(bufferSize),2);
+    // memcpy(sendBuf,(uint8_t*)&(bufferSize),2);
     sendBuf[PACKET_FLAG_INDEX] = M_MESSAGE_ERROR_DESTINATION;
-    sendBuf[3] = strlen(senderHandle) + 1;
-    strcpy(sendBuf + 4, destinationHandle);
+    sendBuf[1] = strlen(senderHandle) + 1;
+    strcpy(sendBuf + 2, destinationHandle);
     sendBuf[bufferSize - 1] = '\0';
     sendPDU(senderSocket, sendBuf, bufferSize);
 }
@@ -152,13 +158,13 @@ int ForwardMessage(char *senderHandle, char *destinationHandle, char *message, s
         //check to see if we have a handle in all clients that match with destination handle
         if (strcmp(destinationHandle,p->handle) == 0) {
             int messageLength = strlen(message) + 1;
-            int bufferSize = messageLength + strlen(senderHandle) + 2 + 3; //accounts for length sender handle and 2 because of colon and space and the 3 is for header
+            int bufferSize = messageLength + strlen(senderHandle) + 2 + 1; //accounts for length sender handle and 2 because of colon and space and the 3 is for header
             char sendBuf[bufferSize];
-            memcpy(sendBuf,(uint8_t*)&(bufferSize),2);
+            // memcpy(sendBuf,(uint8_t*)&(bufferSize),2);
             sendBuf[PACKET_FLAG_INDEX] = DEFAULT_MESSAGE_FROM_SERVER; 
-            strcpy(sendBuf + 3, senderHandle);
-            strcat(sendBuf + 3, ": ");
-            strcat(sendBuf + 3, message);
+            strcpy(sendBuf + 1, senderHandle);
+            strcat(sendBuf + 1, ": ");
+            strcat(sendBuf + 1, message);
             int sent = sendPDU(p->socket, sendBuf, bufferSize);
             return 0; //successfully sent
         }
@@ -194,19 +200,19 @@ int RemoveClient_Socket(int socketNumber, sClient **headClients) {
 
 void BroadCastHandler(int socketNumber, char * buf,sClient **headClients) {
     sClient *p = *headClients;
-    char *senderHandle = buf + 4;
-    char *broadCastMessage = buf + 4 + buf[3]; //this is to account for offset to get to the index of broadcast messages in the packet
+    char *senderHandle = buf + 2;
+    char *broadCastMessage = buf + 2 + buf[1]; //this is to account for offset to get to the index of broadcast messages in the packet
     while (p) {
         if (p->socket != socketNumber)
         {
             int messageLength = strlen(broadCastMessage) + 1;   
-            int bufferSize = messageLength + strlen(senderHandle) + 2 + 3; //accounts for length sender handle and 2 because of colon and space and the 3 is for header
+            int bufferSize = messageLength + strlen(senderHandle) + 2 + 1; //accounts for length sender handle and 2 because of colon and space and the 3 is for header
             char sendBuf[bufferSize];
             memcpy(sendBuf,(uint8_t*)&(bufferSize),2);
             sendBuf[PACKET_FLAG_INDEX] = DEFAULT_MESSAGE_FROM_SERVER; 
-            strcpy(sendBuf + 3, senderHandle);
-            strcat(sendBuf + 3, ": ");
-            strcat(sendBuf + 3, broadCastMessage);
+            strcpy(sendBuf + 1, senderHandle);
+            strcat(sendBuf + 1, ": ");
+            strcat(sendBuf + 1, broadCastMessage);
             int sent = sendPDU(p->socket, sendBuf, bufferSize);
         }
         
@@ -219,20 +225,20 @@ void BroadCastHandler(int socketNumber, char * buf,sClient **headClients) {
 int processClientPacket(int socketNumber, char * buf, sClient **headClients){
 
 
-    uint8_t flag = buf[2];
+    uint8_t flag = buf[PACKET_FLAG_INDEX];
     switch (flag) {
         case INITIAL_PACKET:
         {
             int status = SUCCESS_PROCESS_PACKET;
-            char returnBuf[3];
-            returnBuf[0] = '\0';
-            returnBuf[1] = '\3'; //PDU LENGTH is 3 for returnBuf of initial packet
-            returnBuf[2] = POSITIVE_INITIAL_PACKET;
+            char returnBuf[1];
+            // returnBuf[0] = '\0';
+            // returnBuf[1] = '\3'; //PDU LENGTH is 3 for returnBuf of initial packet
+            returnBuf[PACKET_FLAG_INDEX] = POSITIVE_INITIAL_PACKET;
 
 
             // printf("-----------Processing Inital Packet------------\n");
-            char * handleName = malloc(sizeof(char) * buf[3]);
-            memcpy(handleName,buf+4,buf[3]);
+            char * handleName = malloc(sizeof(char) * buf[1]);
+            memcpy(handleName,buf+2,buf[1]);
             if (*headClients == NULL) {
                 sClient *temp = malloc(sizeof(sClient));
                 temp->flag = INITIAL_PACKET;
@@ -255,7 +261,7 @@ int processClientPacket(int socketNumber, char * buf, sClient **headClients){
                         // printf("Hanlde already in use: %s\n", handleName);
                         handleFound = 1;
                         free(handleName);
-                        returnBuf[2] = NEGATIVE_INITIAL_PACKET;
+                        returnBuf[PACKET_FLAG_INDEX] = NEGATIVE_INITIAL_PACKET;
                         status = ERROR_PROCESS_PACKET;
                     }
                     p = p->next;
@@ -266,7 +272,7 @@ int processClientPacket(int socketNumber, char * buf, sClient **headClients){
                     // printf("Hanlde already in use: %s\n", handleName);
                     handleFound = 1;
                     free(handleName);
-                    returnBuf[2] = NEGATIVE_INITIAL_PACKET;
+                    returnBuf[PACKET_FLAG_INDEX] = NEGATIVE_INITIAL_PACKET;
                     status = ERROR_PROCESS_PACKET;
                 }
 
@@ -283,7 +289,7 @@ int processClientPacket(int socketNumber, char * buf, sClient **headClients){
                     // printf("Client created %s\n", p->next->handle);
                 }
             }
-            int returnSent = sendPDU(socketNumber, returnBuf, 3);
+            int returnSent = sendPDU(socketNumber, returnBuf, 1);
             // printf("Initial packet Finished!\n");
             return status;
         }
@@ -307,11 +313,11 @@ int processClientPacket(int socketNumber, char * buf, sClient **headClients){
         {
             int exit_status = RemoveClient_Socket(socketNumber,headClients);
             if (exit_status == socketNumber) {
-                char pduACK[3];
-                pduACK[0] = '\0';
-                pduACK[1] = '\3';
-                pduACK[2] = ACK_EXITING;
-                sendPDU(socketNumber, pduACK, 3);
+                char pduACK[1];
+                // pduACK[0] = '\0';
+                // pduACK[1] = '\3';
+                pduACK[PACKET_FLAG_INDEX] = ACK_EXITING;
+                sendPDU(socketNumber, pduACK, 1);
                 return CLIENT_EXITING;
             }
         }

@@ -57,6 +57,7 @@ int main(int argc, char * argv[])
 
     char *clientHandleName = malloc(sizeof(char) * (senderLength + 1)); //add one to take account for that '\0'
     memcpy(clientHandleName,argv[1],senderLength);
+	senderLength++; //accounts for null terminator as a singular byte
     clientHandleName[senderLength] = '\0';
     // printf("ClientHandleName %s\n", clientHandleName);
     
@@ -66,7 +67,7 @@ int main(int argc, char * argv[])
 	socketNum = tcpClientSetup(argv[2], argv[3], DEBUG_FLAG);
 	// printf("SocketNum %d\n", socketNum);
 	setupClientPoll(socketNum);
-    senderLength = sendInitialPacket(argv[1], socketNum);
+    sendInitialPacket(argv[1], socketNum);
 	// pduSend = sendToServer(socketNum);
 
 	PrintDollarSign();
@@ -116,26 +117,26 @@ int main(int argc, char * argv[])
 
 int sendInitialPacket(char * handleName, int serverSocket) {
 
-    uint8_t bufferLength [2];
+    // uint8_t bufferLength [2];
     int handleLen= strlen(handleName);
-    int pduLength = handleLen + 5; //first extra 4 byte is for the packet set up and last byte is \0
-    memcpy(bufferLength,(uint8_t*)&(pduLength),2);
+    int pduLength = handleLen + 3; //first extra 4 byte is for the packet set up and last byte is \0
+    // memcpy(bufferLength,(uint8_t*)&(pduLength),2);
 
 
     char sendBuf[pduLength]; 
-    sendBuf[0] = bufferLength[1];
-    sendBuf[1] = bufferLength[0];
-    sendBuf[2] = INITIAL_PACKET;
-    sendBuf[3] = handleLen + 1; //add one because of the \0
+    // sendBuf[0] = bufferLength[1];
+    // sendBuf[1] = bufferLength[0];
+    sendBuf[0] = INITIAL_PACKET;
+    sendBuf[1] = handleLen + 1; //add one because of the \0
 
     int sent = 0;
 
     for (int i = 0; i < handleLen; i++) {
-        sendBuf[i + 4] = handleName[i];
+        sendBuf[i + 2] = handleName[i];
     }
-    sendBuf[handleLen + 4] = '\0';
+    sendBuf[handleLen + 2] = '\0';
     sent = sendPDU(serverSocket, sendBuf, pduLength);
-    return pduLength - 4;
+    return sent;
 }
 
 
@@ -167,7 +168,8 @@ int sendInputAsPacket(int socketNum, char * buffer, int senderLength, char * sen
     char * tokenSplit;
     char space[2] = " ";
     tokenSplit = strtok(buffer, space);
-    int pduSize = 4 + senderLength; //initially it has this to account for Header(3bytes) + senderLength(1byte) + lengthOfSenderHandle
+    int pduSize;
+	pduSize = 2 + senderLength; //initially it has this to account for Header(3bytes) + senderLength(1byte) + lengthOfSenderHandle
     // PrintDollarSign();
 	// printf("Buffer Message %s\n", buffer + 19);
 
@@ -190,7 +192,6 @@ int sendInputAsPacket(int socketNum, char * buffer, int senderLength, char * sen
 			return 0;
 		}
 		
-		uint8_t bufferLength[2];
         char *allHandles[handleAmount];
         char *currentHandle;
         // printf("Handle Amount is %i\n", handleAmount);
@@ -208,6 +209,7 @@ int sendInputAsPacket(int socketNum, char * buffer, int senderLength, char * sen
         }
 		
 		char *messageToSend = buffer + offsetMessages;
+		// printf("message to send length %u\n", strlen(messageToSend));
 		pduSize = pduSize + strlen(messageToSend) + 1; //plus one here to account for null terminator at the end
 
 
@@ -216,15 +218,12 @@ int sendInputAsPacket(int socketNum, char * buffer, int senderLength, char * sen
 
 		//now create the buffer to send since we know the pdusize already
 		uint8_t pduPacket[pduSize];
-		memcpy(bufferLength,(uint8_t*)&(pduSize),2);
 		// printf("Line 177 \n");
-		uint8_t *p = pduPacket + 3; //points starting at length of sender
+		uint8_t *p = pduPacket + 1; //points starting at length of sender
 		// printf("Line 179 \n");
 		// memcpy(pduPacket, (uint8_t)&(pduSize),2);
 		// printf("Line 181 \n");
 		//setting up header
-		pduPacket[1] = bufferLength[0];
-		pduPacket[0] = bufferLength[1];
 		pduPacket[PACKET_FLAG_INDEX] = M_MESSAGE;
 
 		// printf("Line 182\n");
@@ -263,17 +262,17 @@ int sendInputAsPacket(int socketNum, char * buffer, int senderLength, char * sen
 		{
 			breakup = messageLength / 200;
 			messageLength = 200;
-			printf("Break up %i\n", breakup);
+			// printf("Break up %i\n", breakup);
 		}
-		pduSize = pduSize + messageLength + 1;
+		pduSize = pduSize + messageLength + 1; //1 for null terminator
 		uint8_t pduPacket[pduSize];
-		uint8_t bufferLength[2];
-		memcpy(bufferLength, (uint8_t*)&(pduSize), 2);
-		pduPacket[0] = bufferLength[1];
-		pduPacket[1] = bufferLength[0];
+		// uint8_t bufferLength[2];
+		// memcpy(bufferLength, (uint8_t*)&(pduSize), 2);
+		// pduPacket[0] = bufferLength[1];
+		// pduPacket[1] = bufferLength[0];
 		pduPacket[PACKET_FLAG_INDEX] = BROADCAST_PACKET;
-		pduPacket[3] = senderLength;
-		strcpy(pduPacket + 4, senderHandle);
+		pduPacket[1] = senderLength;
+		strcpy(pduPacket + 2, senderHandle);
 		int sent = 0;
 		if (breakup > 0)
 		{
@@ -281,20 +280,23 @@ int sendInputAsPacket(int socketNum, char * buffer, int senderLength, char * sen
 			{
 				if (i != breakup)
 				{
-					strncpy(pduPacket + 4 + senderLength, messageToSend,200);
+					strncpy(pduPacket + 2 + senderLength, messageToSend, 200);
 					pduPacket[pduSize - 1] = '\0';
 					sent += sendPDU(socketNum, pduPacket, pduSize);
 					messageToSend = messageToSend + 200;
 				}
 				else {
-					strcpy(pduPacket + 4 + senderLength, messageToSend);
-					pduSize = pduSize - (200 - strlen(messageToSend));
+					strcpy(pduPacket + 2 + senderLength, messageToSend);
+					pduSize = pduSize - (200 - strlen(messageToSend)) + 1; //extra 1 byte for terminator again
+					pduPacket[pduSize - 1] = '\0';
+					// printf("")
 					sent += sendPDU(socketNum, pduPacket, pduSize);
 				}
 			}
 		}
 		else {
-			strcpy(pduPacket + 4 + senderLength, messageToSend);
+			strcpy(pduPacket + 2 + senderLength, messageToSend);
+			pduPacket[pduSize - 1] = '\0';
 			sent += sendPDU(socketNum, pduPacket, pduSize);
 		}
 		
@@ -302,17 +304,17 @@ int sendInputAsPacket(int socketNum, char * buffer, int senderLength, char * sen
 
 	}
 	else if ((strcmp(tokenSplit, "%L") == 0) || (strcmp(tokenSplit, "%l") == 0)){
-		uint8_t pduPacket[3];
-		int pduLength = 3;
-		memcpy(pduPacket,(uint8_t*)&(pduLength),2);
+		uint8_t pduPacket[1];
+		int pduLength = 1;
+		// memcpy(pduPacket,(uint8_t*)&(pduLength),2);
 		pduPacket[PACKET_FLAG_INDEX] = LIST_HANDLES;
 		int sent = sendPDU(socketNum,pduPacket,pduLength);
 		return sent;
 	}
 	else if ((strcmp(tokenSplit, "%E") == 0) || (strcmp(tokenSplit, "%e") == 0)) {
-		uint8_t pduPacket[3];
-		int pduLength = 3;
-		memcpy(pduPacket, (uint8_t*)&(pduLength),2);
+		uint8_t pduPacket[1];
+		int pduLength = 1;
+		// memcpy(pduPacket, (uint8_t*)&(pduLength),2);
 		pduPacket[PACKET_FLAG_INDEX] = CLIENT_EXITING;
 		int sent = sendPDU(socketNum, pduPacket, pduLength);
 		return sent;
