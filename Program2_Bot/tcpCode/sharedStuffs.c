@@ -81,10 +81,8 @@ void ListOfHandlesHandler(int clientSocket, sClient **headClients) {
     // pduNumHandles[0] = '\0';
     // pduNumHandles[1] = '\4';
     pduNumHandles[PACKET_FLAG_INDEX] = LIST_HANDLES_AMOUNT;
-    uint8_t bufferLength [4];
     totalClients = htons(totalClients);
     memcpy(pduNumHandles + 1,(uint8_t*)&(totalClients),4);
-    int convertedTotalClients = ntohs(totalClients);
 
     // uint8_t bufferLength[2];
     sendPDU(clientSocket, pduNumHandles, 5);
@@ -126,7 +124,8 @@ void MessageHandlerServer(int clientSocket, char * buf, int bufferSize, sClient 
     char *destinations[numDestinations];
     char * temp = buf + 2 + lengthSender + 1;
     int currentDestinationHandleLength;
-    for (int i = 0; i < numDestinations; i++) {
+    int i;
+    for (i = 0; i < numDestinations; i++) {
         currentDestinationHandleLength = *temp;
         destinations[i] = temp + 1;
         temp = temp + currentDestinationHandleLength + 1; //+1 to account for null terminator 
@@ -134,7 +133,7 @@ void MessageHandlerServer(int clientSocket, char * buf, int bufferSize, sClient 
     //now we got all the destinations stored in destinations
     // now temp should point at beginning of messages
     int forwardStatus;
-    for (int i = 0; i < numDestinations; i ++) {
+    for (i = 0; i < numDestinations; i ++) {
         forwardStatus = ForwardPacket(senderHandle, destinations[i], buf, bufferSize, headClients);
         if (forwardStatus < 0 ) {
             //this means could not find a destination so send error message
@@ -153,7 +152,8 @@ void MessageHandlerClient(char * buf) {
     // char *destinations[numDestinations];
     char * temp = buf + 2 + lengthSender + 1;
     int currentDestinationHandleLength;
-    for (int i = 0; i < numDestinations; i++) {
+    int i;
+    for (i = 0; i < numDestinations; i++) {
         currentDestinationHandleLength = *temp;
         // destinations[i] = temp + 1;
         temp = temp + currentDestinationHandleLength + 1; //+1 to account for null terminator 
@@ -185,7 +185,7 @@ int ForwardPacket(char *senderHandle, char *destinationHandle, char *buf, int bu
     while (p) {
         //check to see if we have a handle in all clients that match with destination handle
         if (strcmp(destinationHandle,p->handle) == 0) {
-            int sent = sendPDU(p->socket, buf, bufferSize);
+            sendPDU(p->socket, buf, bufferSize);
             return 0; //successfully sent
         }
         p = p->next;
@@ -257,7 +257,7 @@ void BroadCastHandlerServer(int socketNumber, char * buf, int bufferSize, sClien
     while (p) {
         if (p->socket != socketNumber)
         {
-            int sent = sendPDU(p->socket, buf, bufferSize);
+            sendPDU(p->socket, buf, bufferSize);
         }
         p = p->next;
     }   
@@ -331,7 +331,7 @@ int processClientPacket(int socketNumber, char * buf, int bufferSize, sClient **
                     // printf("Client created %s\n", p->next->handle);
                 }
             }
-            int returnSent = sendPDU(socketNumber, returnBuf, 1);
+            sendPDU(socketNumber, returnBuf, 1);
             // printf("Initial packet Finished!\n");
             return status;
         }

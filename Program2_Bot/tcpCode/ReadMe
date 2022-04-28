@@ -1,7 +1,7 @@
-Lam Tran
+Lam Tran (Noon Session)
 ltran73@calpoly.edu
 Network 464
 
 make all
-./myServer
-./myCclient <host> <portnumber>
+./server <port>
+./cclient <handle> <host> <portnumber>

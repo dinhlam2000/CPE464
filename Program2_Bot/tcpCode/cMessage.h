@@ -33,7 +33,7 @@
 #define PACKET_FLAG_INDEX 0
 
 
-int recvPDU(int clientSocket, uint8_t * dataBuffer, int bufferLen);
-int sendPDU(int socketNumber, uint8_t * dataBuffer, int lengthOfData);
+int recvPDU(int clientSocket, char * dataBuffer, int bufferLen);
+int sendPDU(int socketNumber, char * dataBuffer, int lengthOfData);
 
 #endif

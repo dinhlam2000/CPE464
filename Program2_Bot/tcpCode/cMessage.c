@@ -2,7 +2,7 @@
 #define MAXBUF 1024
 
 
-int sendPDU(int socketNumber, uint8_t * dataBuffer, int lengthOfData) {
+int sendPDU(int socketNumber, char * dataBuffer, int lengthOfData) {
 
     int sent = 0;
     uint16_t temp;
@@ -10,8 +10,6 @@ int sendPDU(int socketNumber, uint8_t * dataBuffer, int lengthOfData) {
 
     uint8_t newDataBuffer[lengthOfData + 2];
     
-    int i = 0;
-
     memcpy(newDataBuffer + 2, dataBuffer , lengthOfData);
     // while (i < lengthOfData) {
     //     newDataBuffer[i + 2] = dataBuffer[i];
@@ -30,7 +28,7 @@ int sendPDU(int socketNumber, uint8_t * dataBuffer, int lengthOfData) {
     return sent - 2;
 };
 
-int recvPDU(int clientSocket, uint8_t * dataBuffer, int bufferLen) {
+int recvPDU(int clientSocket, char * dataBuffer, int bufferLen) {
 	int messageLen = 0;
     int pduLen = 0;
 

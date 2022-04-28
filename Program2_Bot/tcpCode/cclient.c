@@ -82,7 +82,7 @@ int main(int argc, char * argv[])
 			pduReturned = processServer(socketReady);
 
 			// printf("FLAG RETURNED FROM SERVER %d", pduReturned);
-            if ((pduReturned == NEGATIVE_INITIAL_PACKET)) {
+            if (pduReturned == NEGATIVE_INITIAL_PACKET) {
 				printf("Handle already in use: %s\n", clientHandleName);
                 break;
             }
@@ -131,7 +131,9 @@ int sendInitialPacket(char * handleName, int serverSocket) {
 
     int sent = 0;
 
-    for (int i = 0; i < handleLen; i++) {
+	int i;
+
+    for (i = 0; i < handleLen; i++) {
         sendBuf[i + 2] = handleName[i];
     }
     sendBuf[handleLen + 2] = '\0';
@@ -197,8 +199,8 @@ int sendInputAsPacket(int socketNum, char * buffer, int senderLength, char * sen
         // printf("Handle Amount is %i\n", handleAmount);
 		
 		int offsetMessages = handleAmount + 1 + 4; //this is the offset to account for spaces and first 4 bytes of command
-
-        for (int i = 0; i < handleAmount; i++)
+		int i;
+        for (i = 0; i < handleAmount; i++)
         {
             currentHandle = strtok(NULL,space);
             allHandles[i] = currentHandle;
@@ -217,9 +219,9 @@ int sendInputAsPacket(int socketNum, char * buffer, int senderLength, char * sen
 		// printf("REMAINDER MESSAGE = %s\n", buffer+offsetMessages);
 
 		//now create the buffer to send since we know the pdusize already
-		uint8_t pduPacket[pduSize];
+		char pduPacket[pduSize];
 		// printf("Line 177 \n");
-		uint8_t *p = pduPacket + 1; //points starting at length of sender
+		char *p = pduPacket + 1; //points starting at length of sender
 		// printf("Line 179 \n");
 		// memcpy(pduPacket, (uint8_t)&(pduSize),2);
 		// printf("Line 181 \n");
@@ -234,7 +236,7 @@ int sendInputAsPacket(int socketNum, char * buffer, int senderLength, char * sen
 		// printf("P sender handle %s\n", pduPacket + 4);
 		p = p + senderLength;
 		*p = handleAmount;
-		for (int i = 0; i < handleAmount; i++) {
+		for (i = 0; i < handleAmount; i++) {
 			p = p + 1; //move up for destination handle length
 			*p = strlen(allHandles[i]) + 1; // set destination handle length
 			p = p + 1;
@@ -265,7 +267,7 @@ int sendInputAsPacket(int socketNum, char * buffer, int senderLength, char * sen
 			// printf("Break up %i\n", breakup);
 		}
 		pduSize = pduSize + messageLength + 1; //1 for null terminator
-		uint8_t pduPacket[pduSize];
+		char pduPacket[pduSize];
 		// uint8_t bufferLength[2];
 		// memcpy(bufferLength, (uint8_t*)&(pduSize), 2);
 		// pduPacket[0] = bufferLength[1];
@@ -276,7 +278,8 @@ int sendInputAsPacket(int socketNum, char * buffer, int senderLength, char * sen
 		int sent = 0;
 		if (breakup > 0)
 		{
-			for (int i = 0; i <= breakup; i++) 
+			int i;
+			for (i = 0; i <= breakup; i++) 
 			{
 				if (i != breakup)
 				{
@@ -304,7 +307,7 @@ int sendInputAsPacket(int socketNum, char * buffer, int senderLength, char * sen
 
 	}
 	else if ((strcmp(tokenSplit, "%L") == 0) || (strcmp(tokenSplit, "%l") == 0)){
-		uint8_t pduPacket[1];
+		char pduPacket[1];
 		int pduLength = 1;
 		// memcpy(pduPacket,(uint8_t*)&(pduLength),2);
 		pduPacket[PACKET_FLAG_INDEX] = LIST_HANDLES;
@@ -312,7 +315,7 @@ int sendInputAsPacket(int socketNum, char * buffer, int senderLength, char * sen
 		return sent;
 	}
 	else if ((strcmp(tokenSplit, "%E") == 0) || (strcmp(tokenSplit, "%e") == 0)) {
-		uint8_t pduPacket[1];
+		char pduPacket[1];
 		int pduLength = 1;
 		// memcpy(pduPacket, (uint8_t*)&(pduLength),2);
 		pduPacket[PACKET_FLAG_INDEX] = CLIENT_EXITING;
