@@ -1,12 +1,12 @@
 # Makefile for CPE464 tcp test code
 # written by Hugh Smith - April 2019
 
-CC= gcc
-CFLAGS= -g -Wall
+CC= gcc 
+CFLAGS= -g -Wall -O0
 LIBS = 
 
 
-all:   myClient myServer
+all:   cclient server 
 
 
 
@@ -16,7 +16,7 @@ myClient: myClient.c networks.o gethostbyname.o cMessage.o pollLib.o safeUtil.o
 myServer: myServer.c networks.o gethostbyname.o cMessage.o
 	$(CC) $(CFLAGS) -o myServer myServer.c networks.o gethostbyname.o cMessage.o pollLib.o safeUtil.o $(LIBS)
 
-myAll: cclient server
+myAll: myClient myServer
 
 cclient: cclient.c networks.o gethostbyname.o cMessage.o pollLib.o safeUtil.o sharedStuffs.o
 	$(CC) $(CFLAGS) -o cclient cclient.c networks.o gethostbyname.o cMessage.o pollLib.o safeUtil.o sharedStuffs.o $(LIBS)
@@ -32,7 +32,7 @@ cleano:
 	rm -f *.o
 
 clean:
-	rm -f myServer myClient *.o
+	rm -f myServer myCclient cclient server *.o
 
 
 
